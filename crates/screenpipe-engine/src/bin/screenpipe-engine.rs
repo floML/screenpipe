@@ -345,8 +345,8 @@ async fn main() -> anyhow::Result<()> {
             screenpipe_engine::cli::connection::handle_connection_command(subcommand).await?;
             return Ok(());
         }
-        Command::Vault { ref subcommand } => {
-            screenpipe_engine::cli::vault::handle_vault_command(subcommand).await?;
+        Command::Vault { ref subcommand, port } => {
+            screenpipe_engine::cli::vault::handle_vault_command(subcommand, port).await?;
             return Ok(());
         }
         Command::Install {

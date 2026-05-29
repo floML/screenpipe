@@ -238,6 +238,9 @@ pub enum Command {
     Vault {
         #[command(subcommand)]
         subcommand: VaultCommand,
+        /// Port of the running screenpipe daemon (used to delegate lock/unlock when daemon is active)
+        #[arg(long, default_value_t = 3030)]
+        port: u16,
     },
 
     /// Install a bundle of pipes from a manifest URL

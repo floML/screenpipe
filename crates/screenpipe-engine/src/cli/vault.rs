@@ -13,14 +13,11 @@ fn screenpipe_dir() -> anyhow::Result<std::path::PathBuf> {
     Ok(screenpipe_core::paths::default_screenpipe_data_dir())
 }
 
-/// Returns true if the screenpipe daemon appears to be running (port 3030 reachable).
-fn daemon_is_running() -> bool {
+/// Returns true if the screenpipe daemon appears to be running on the given port.
+fn daemon_is_running(port: u16) -> bool {
     use std::net::TcpStream;
-    TcpStream::connect_timeout(
-        &"127.0.0.1:3030".parse().unwrap(),
-        Duration::from_millis(250),
-    )
-    .is_ok()
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok()
 }
 
 /// Returns true if another process holds an open lock on the SQLite DB file.
@@ -48,7 +45,7 @@ fn db_is_locked(_db_path: &std::path::Path) -> bool {
     false
 }
 
-pub async fn handle_vault_command(command: &VaultCommand) -> anyhow::Result<()> {
+pub async fn handle_vault_command(command: &VaultCommand, port: u16) -> anyhow::Result<()> {
     let dir = screenpipe_dir()?;
     let vault = VaultManager::new(dir.clone());
 
@@ -79,13 +76,13 @@ pub async fn handle_vault_command(command: &VaultCommand) -> anyhow::Result<()> 
         VaultCommand::Lock { .. } => {
             let db_path = dir.join("db.sqlite");
 
-            if daemon_is_running() {
+            if daemon_is_running(port) {
                 // Delegate to the daemon so we don't race its open db connection.
                 // Encrypting db bytes in-place while SQLite has the file open corrupts it.
                 eprintln!("screenpipe daemon is running — delegating lock to daemon");
                 let client = reqwest::Client::new();
                 let resp = client
-                    .post("http://127.0.0.1:3030/vault/lock")
+                    .post(format!("http://127.0.0.1:{}/vault/lock", port))
                     .timeout(Duration::from_secs(300))
                     .send()
                     .await?;
@@ -126,11 +123,11 @@ pub async fn handle_vault_command(command: &VaultCommand) -> anyhow::Result<()> 
         VaultCommand::Unlock { .. } => {
             let password = read_password("vault password: ")?;
 
-            if daemon_is_running() {
+            if daemon_is_running(port) {
                 eprintln!("screenpipe daemon is running — delegating unlock to daemon");
                 let client = reqwest::Client::new();
                 let resp = client
-                    .post("http://127.0.0.1:3030/vault/unlock")
+                    .post(format!("http://127.0.0.1:{}/vault/unlock", port))
                     .json(&json!({ "password": password }))
                     .timeout(Duration::from_secs(300))
                     .send()
