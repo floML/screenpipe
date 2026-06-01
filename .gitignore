@@ -48,6 +48,9 @@ node_modules/
 venv/
 app.py
 *.pyc
+
+# Local-only files (dev scripts, personal configs, etc.)
+.local/Screenpipe.app/
 *.pyo
 *.pyd
 *.py

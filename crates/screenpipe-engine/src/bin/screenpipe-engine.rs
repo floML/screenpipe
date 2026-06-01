@@ -774,6 +774,15 @@ async fn main() -> anyhow::Result<()> {
     // This helps track users who may have screen capture issues due to old macOS
     analytics::check_macos_version();
 
+    {
+        let vault = screenpipe_vault::VaultManager::new(local_data_dir.clone());
+        if vault.is_set_up() && vault.is_locked().await {
+            eprintln!("error: vault is locked — data is encrypted");
+            eprintln!("run `screenpipe vault unlock` first, then start recording");
+            std::process::exit(1);
+        }
+    }
+
     let db = Arc::new(
         DatabaseManager::new(
             &format!("{}/db.sqlite", local_data_dir.to_string_lossy()),
