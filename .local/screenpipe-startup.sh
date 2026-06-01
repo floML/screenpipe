@@ -13,14 +13,14 @@ exec "$SCREENPIPE" record \
   `# Don't record audio (privacy/performance)` \
   --encrypt-secrets \
   `# Encrypt sensitive data like passwords in storage` \
-  --async-pii-redaction \
-  `# Redact PII (phone numbers, emails, etc.) asynchronously to avoid blocking` \
-  --ignored-windows "1Password" \
-  `# Ignore password manager window content` \
-  --ignored-windows "Bitwarden" \
-  `# Ignore password manager window content` \
-  --ignored-windows "Keychain Access" \
-  `# Ignore system keychain window content` \
+#   --async-pii-redaction \
+#   `# Redact PII (phone numbers, emails, etc.) asynchronously to avoid blocking` \
+#   --ignored-windows "1Password" \
+#   `# Ignore password manager window content` \
+#   --ignored-windows "Bitwarden" \
+#   `# Ignore password manager window content` \
+#   --ignored-windows "Keychain Access" \
+#   `# Ignore system keychain window content` \
   -a whisper-large-v3-turbo \
   `# Use Whisper Turbo model for fast, accurate speech-to-text` \
   --retention-days 14 \
@@ -29,6 +29,8 @@ exec "$SCREENPIPE" record \
   `# Don't send telemetry data back to Screenpipe servers` \
   --disable-vision \
   `# Disable vision/screenshot capture for lower memory usage.` \
+  --disable-meeting-detector \
+  `# Disable auto-detection (Webex running in bg would block transcription)` \
 
 # Other important screenpipe options:
 # --budget-tokens N          Limit tokens in LLM context (default: 10000)
