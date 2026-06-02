@@ -7,11 +7,8 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")" && pwd)/Screenpipe.app"
-AUDIO_APP_DIR="$(cd "$(dirname "$0")" && pwd)/ScreenpipeAudio.app"
 CONTENTS="$APP_DIR/Contents"
 MACOS="$CONTENTS/MacOS"
-AUDIO_CONTENTS="$AUDIO_APP_DIR/Contents"
-AUDIO_MACOS="$AUDIO_CONTENTS/MacOS"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ---------------------------------------------------------------------------
@@ -47,49 +44,35 @@ PLIST
 
 cat > "$MACOS/screenpipe-wrapper" <<WRAPPER
 #!/bin/bash
+# Redirect stdio to log file so 'open' can't leak output to the launching TTY
+# (this was causing console garbage after sp-stop).
+exec >> "$HOME/.screenpipe/screenpipe.log" 2>&1
+# Use the in-bundle binary so macOS attributes TCC to this .app bundle.
+export SCREENPIPE_BINARY="\$(cd "\$(dirname "\$0")" && pwd)/screenpipe"
+if [[ "\${1:-}" == "--audio" ]]; then
+  exec "$SCRIPT_DIR/screenpipe-startup-audio.sh"
+fi
 exec "$SCRIPT_DIR/screenpipe-startup.sh"
 WRAPPER
 chmod +x "$MACOS/screenpipe-wrapper"
 
-# ---------------------------------------------------------------------------
-# Build ScreenpipeAudio.app (audio enabled)
-# ---------------------------------------------------------------------------
-echo "Creating ScreenpipeAudio.app at $AUDIO_APP_DIR ..."
-mkdir -p "$AUDIO_MACOS"
+# Hardlink the screenpipe binary into the bundle so the running process lives
+# inside the bundle path → TCC can attribute mic/screen permissions to the .app.
+ln -f "$SCRIPT_DIR/../target/release/screenpipe" "$MACOS/screenpipe"
+rm -rf "$SCRIPT_DIR/ScreenpipeAudio.app"
 
-cat > "$AUDIO_CONTENTS/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIdentifier</key>
-  <string>com.screenpipe.local.audio</string>
-  <key>CFBundleName</key>
-  <string>ScreenpipeAudio</string>
-  <key>CFBundleExecutable</key>
-  <string>screenpipe-audio-wrapper</string>
-  <key>CFBundleVersion</key>
-  <string>1.0</string>
-  <key>LSUIElement</key>
-  <true/>
-  <key>NSScreenCaptureUsageDescription</key>
-  <string>Screenpipe needs screen recording to capture what you see.</string>
-  <key>NSMicrophoneUsageDescription</key>
-  <string>Screenpipe needs microphone access to capture what you hear.</string>
-</dict>
-</plist>
-PLIST
-
-cat > "$AUDIO_MACOS/screenpipe-audio-wrapper" <<WRAPPER
-#!/bin/bash
-exec "$SCRIPT_DIR/screenpipe-startup-audio.sh"
-WRAPPER
-chmod +x "$AUDIO_MACOS/screenpipe-audio-wrapper"
+# ---------------------------------------------------------------------------
+# Ad-hoc codesign the bundle. Without this macOS has no stable identity
+# for the app and skips the TCC prompt entirely. Ad-hoc sig (-s -) is fine
+# for local use — bundle ID + wrapper script hash become the TCC key.
+# Wrapper script doesn't change across rebuilds, so permissions persist.
+# ---------------------------------------------------------------------------
+codesign --force --deep --sign - "$APP_DIR"
+echo "Signed Screenpipe.app (ad-hoc)."
 
 echo "Done! Usage:"
 echo "  open $APP_DIR          # start without audio"
-echo "  open $AUDIO_APP_DIR    # start with audio (Whisper)"
+echo "  open $APP_DIR --args --audio    # start with audio (Whisper)"
 echo "  kill \$(pgrep -f 'screenpipe record')  # stop"
 echo "  $SCRIPT_DIR/../target/release/screenpipe status  # check status"
 
@@ -110,7 +93,7 @@ sp-start-audio() {
     echo \"⚠️  screenpipe is already running (pid \$(pgrep -f 'screenpipe record' | head -1)). Run 'sp-stop' first.\"
     return 1
   fi
-  open '$AUDIO_APP_DIR' && echo '✅ screenpipe started (audio + Whisper)'
+  open '$APP_DIR' --args --audio && echo '✅ screenpipe started (audio + Whisper)'
 }
 sp-stop() {
   if ! pgrep -f 'screenpipe record' >/dev/null; then
@@ -147,7 +130,7 @@ else
   echo "Added screenpipe aliases to ~/.zshrc."
 fi
 echo "  sp-start        — open Screenpipe.app (no audio)"
-echo "  sp-start-audio  — open ScreenpipeAudio.app (Whisper transcription)"
+echo "  sp-start-audio  — open Screenpipe.app in audio mode (Whisper transcription)"
 echo "  sp-stop         — kill the running screenpipe process"
 echo "  sp-status       — check screenpipe status"
 echo "Run 'source ~/.zshrc' (or open a new terminal) to activate them."
