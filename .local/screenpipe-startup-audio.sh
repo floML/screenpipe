@@ -4,7 +4,8 @@
 # Local development startup script — audio enabled variant (not tracked in git)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SCREENPIPE="$SCRIPT_DIR/../target/release/screenpipe"
+# Prefer in-bundle binary (set by wrapper) so TCC attributes to the .app.
+SCREENPIPE="${SCREENPIPE_BINARY:-$SCRIPT_DIR/../target/release/screenpipe}"
 
 exec "$SCREENPIPE" record \
   --disable-clipboard-capture \
@@ -13,11 +14,13 @@ exec "$SCREENPIPE" record \
   `# Encrypt sensitive data like passwords in storage` \
   -a whisper-large-v3-turbo \
   `# Use Whisper Turbo model for fast, accurate speech-to-text` \
-  --retention-days 14 \
-  `# Keep recordings for 14 days, then auto-delete` \
+  --use-system-default-audio \
+  `# Follow the system default mic — triggers TCC mic prompt on first run` \
+  --retention-days 1 \
+  `# Keep recordings for 1 day, then auto-delete` \
   --disable-telemetry \
   `# Don't send telemetry data back to Screenpipe servers` \
-  --disable-vision \
+  --disable-vision #\
   `# Disable vision/screenshot capture for lower memory usage.` \
-  --disable-meeting-detector \
-  `# Disable auto-detection (Webex running in bg would block transcription)` \
+  # --disable-meeting-detector \
+  # `# Disable auto-detection (Webex running in bg would block transcription)` \
